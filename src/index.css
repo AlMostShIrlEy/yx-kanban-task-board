@@ -1,111 +1,40 @@
-:root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+@import "tailwindcss";
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+/* @theme — Tailwind v4 的 CSS-first 配置入口。在这里定义的 --color-X / --font-X
+   等 token 会自动生成对应 utility(bg-X / text-X / font-X 等),并暴露为 :root
+   上的 CSS 变量,可在自定义 CSS 里用 var() 引用。代替了 v3 的 tailwind.config.js。 */
+@theme {
+  /* App 背景 */
+  --color-background: #F5F5F8;
+  --color-sidebar:    #FFFFFF;
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  /* 6 种 pastel 卡片色,bg 与 fg 成对(用法:bg-card-blue-bg + text-card-blue-fg) */
+  --color-card-blue-bg:   #E5EDFF;
+  --color-card-blue-fg:   #1E3A8A;
+  --color-card-purple-bg: #E8E4FF;
+  --color-card-purple-fg: #4C1D95;
+  --color-card-pink-bg:   #FFE4E8;
+  --color-card-pink-fg:   #9F1239;
+  --color-card-orange-bg: #FFE9D5;
+  --color-card-orange-fg: #9A3412;
+  --color-card-green-bg:  #D5F5E5;
+  --color-card-green-fg:  #065F46;
+  --color-card-yellow-bg: #FFF3D5;
+  --color-card-yellow-fg: #854D0E;
 
-  @media (max-width: 1024px) {
-    font-size: 16px;
+  /* 品牌 / Action */
+  --color-brand:  #7C3AED;
+  --color-action: #0F172A;
+
+  /* 字体 — 覆盖 Tailwind 默认 sans,Preflight 会自动应用到 <body> */
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+/* @layer base — Tailwind 三层架构(base / components / utilities)中的 base 层。
+   写在这里的样式优先级低于 utility 类,后续在组件上加 className 时不会冲突。 */
+@layer base {
+  body {
+    background: var(--color-background);
+    color: var(--color-slate-700); /* v4 默认色阶自动暴露为 CSS var */
   }
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
-
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
-}
-
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-}
-
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
-}
-
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
-  margin: 0;
-}
-
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
-
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
 }
