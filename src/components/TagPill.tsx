@@ -8,23 +8,26 @@ interface Props {
   className?: string
 }
 
-// Static class lookup so Tailwind v4 JIT can scan the literal class names.
-// Dynamic strings like `bg-card-${color}-bg` are NOT picked up by the
-// scanner, so we list every variant explicitly.
+// Label palette is intentionally distinct from the card palette (which uses
+// the bg-card-X-bg / text-card-X-fg @theme tokens). Pills use lighter
+// Tailwind -50/-700 stops so a label always sits visually on top of any
+// card background — no risk of a "blue label on blue card" disappearing.
+// Both palettes share the same 6 color names (CardColor enum) for API
+// simplicity; they differ only in rendered class strings.
+//
+// Static lookup so Tailwind v4 JIT can scan the literal class names —
+// dynamic `bg-${color}-50` strings would NOT be picked up.
 const COLOR_CLASSES: Record<CardColor, string> = {
-  blue:   'bg-card-blue-bg text-card-blue-fg',
-  purple: 'bg-card-purple-bg text-card-purple-fg',
-  pink:   'bg-card-pink-bg text-card-pink-fg',
-  orange: 'bg-card-orange-bg text-card-orange-fg',
-  green:  'bg-card-green-bg text-card-green-fg',
-  yellow: 'bg-card-yellow-bg text-card-yellow-fg',
+  blue:   'bg-blue-50 text-blue-700',
+  purple: 'bg-purple-50 text-purple-700',
+  pink:   'bg-pink-50 text-pink-700',
+  orange: 'bg-orange-50 text-orange-700',
+  green:  'bg-green-50 text-green-700',
+  yellow: 'bg-yellow-50 text-yellow-700',
 }
 
-// Soft pastel pill for #tag / label rendering. Reuses the 6-color card
-// palette so pills feel native to whichever card they sit on. Same-color
-// collision (blue pill on blue card) is an accepted ~1/6 edge case;
-// distinct typography weight + rounded shape preserve enough visual
-// boundary even when bg blends.
+// Soft pill for #tag / label rendering. Color required (Label.color is
+// SQL NOT NULL); see palette comment above for the dual-track design.
 export function TagPill({ color, children, className }: Props) {
   return (
     <span

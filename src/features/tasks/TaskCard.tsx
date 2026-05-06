@@ -1,4 +1,4 @@
-import { Tag } from 'lucide-react'
+import { MoreHorizontal, Tag } from 'lucide-react'
 import { AvatarBubble } from '../../components/AvatarBubble'
 import { DueDateBadge } from '../../components/DueDateBadge'
 import { TagPill } from '../../components/TagPill'
@@ -9,6 +9,7 @@ import { CARD_COLORS } from '../../types'
 interface Props {
   task: Task
   className?: string
+  onEditClick?: (taskId: string) => void  // omit → no edit button (Step 5 wires this)
 }
 
 // Static class lookup so Tailwind v4 JIT can scan the literals.
@@ -35,14 +36,16 @@ function hashColor(taskId: string): CardColor {
 }
 
 // TaskCard — pure presentational. dnd-agnostic (Step 6 wraps it in a
-// SortableTaskCard HOC). No onClick yet (Step 5 modal integration adds
-// it). Rendering matches CLAUDE.md card anatomy: pills row → title →
+// SortableTaskCard HOC). Optional onEditClick prop reserves the visual
+// position for the edit-button (Step 5 wires this to TaskModal);
+// currently TaskBoard doesn't pass it so the button stays hidden.
+// Rendering matches CLAUDE.md card anatomy: pills row → title →
 // optional note → footer (avatar + due-date + label-count).
 //
 // DotProgress intentionally NOT rendered — no real progress source
 // (decided in Step 2 Q1; status-derived would have made every card in
 // the same column visually identical).
-export function TaskCard({ task, className }: Props) {
+export function TaskCard({ task, className, onEditClick }: Props) {
   const colorKey = task.color ?? hashColor(task.id)
   const colorClass = CARD_COLOR_CLASSES[colorKey]
   const labelCount = task.labels.length
@@ -57,14 +60,34 @@ export function TaskCard({ task, className }: Props) {
         className
       )}
     >
-      {/* Pills 行 — 仅在有 label 时渲染;flex-wrap 让多 label 自然换行,卡变高 */}
-      {labelCount > 0 && (
-        <div className="mb-3 flex flex-wrap gap-1">
-          {task.labels.map((label) => (
-            <TagPill key={label.id} color={label.color}>
-              #{label.name}
-            </TagPill>
-          ))}
+      {/* Pills + edit-button 行 — 渲染条件:有 label OR 传了 onEditClick。
+          ml-auto 让 button 永远靠右,即使 pills 区域不渲染(避免空 placeholder div);
+          items-start 让 pills 多行 wrap 时 button 仍贴顶部对齐。 */}
+      {(labelCount > 0 || onEditClick) && (
+        <div className="mb-3 flex items-start gap-2">
+          {labelCount > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {task.labels.map((label) => (
+                <TagPill key={label.id} color={label.color}>
+                  #{label.name}
+                </TagPill>
+              ))}
+            </div>
+          )}
+          {onEditClick && (
+            <button
+              type="button"
+              onClick={(e) => {
+                // stopPropagation 防止 Step 6 加 drag 后误触发拖拽
+                e.stopPropagation()
+                onEditClick(task.id)
+              }}
+              className="ml-auto rounded-lg p-1 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
+              aria-label="Edit task"
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </button>
+          )}
         </div>
       )}
 
@@ -83,7 +106,10 @@ export function TaskCard({ task, className }: Props) {
       <div className="mt-4 flex items-center justify-between">
         <AvatarBubble userId={task.user_id} size="sm" />
         <div className="flex items-center gap-2">
-          {task.due_date && <DueDateBadge dueDate={task.due_date} />}
+          {/* Done 列不显示 due-date — "X days overdue" 在已完成任务上无意义 */}
+          {task.due_date && task.status !== 'done' && (
+            <DueDateBadge dueDate={task.due_date} />
+          )}
           {labelCount > 0 && (
             // 跟 DueDateBadge 同款 pill 形状,视觉节奏一致;
             // slate 中性色不跟 severity 色抢权重
