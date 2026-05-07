@@ -9,6 +9,7 @@ interface Props {
   tasks: Task[]                            // already filtered to this status by parent
   loading?: boolean
   onAddTask?: (status: Status) => void     // omit → no + button (Step 5 wires this)
+  onEditClick?: (taskId: string) => void   // pass-through to TaskCard
 }
 
 // Display labels for the 4 statuses. Centralised so renaming a column
@@ -30,7 +31,7 @@ const SKELETON_COUNT = 3
 // Container has NO bg / border — visual grouping comes from header
 // + card stack alone, matching the reference design's flat column style.
 // EmptyState's dashed box is local decoration, not column container chrome.
-export function Column({ status, tasks, loading, onAddTask }: Props) {
+export function Column({ status, tasks, loading, onAddTask, onEditClick }: Props) {
   // Sort by position ASC (LexoRank-lite). Don't mutate the input array
   // — it's parent state, mutating would break React change detection.
   const sorted = [...tasks].sort((a, b) => a.position - b.position)
@@ -71,7 +72,9 @@ export function Column({ status, tasks, loading, onAddTask }: Props) {
         ) : sorted.length === 0 ? (
           <EmptyState />
         ) : (
-          sorted.map((task) => <TaskCard key={task.id} task={task} />)
+          sorted.map((task) => (
+            <TaskCard key={task.id} task={task} onEditClick={onEditClick} />
+          ))
         )}
       </div>
     </div>

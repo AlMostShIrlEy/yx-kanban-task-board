@@ -3,6 +3,13 @@ import { STATUSES } from '../../types'
 import type { Status, Task } from '../../types'
 import { Column } from './Column'
 
+interface Props {
+  // Optional callbacks; when omitted, columns/cards omit their respective
+  // affordances (Step 4 didn't pass these; Step 5 wires them via App).
+  onAddTask?: (status: Status) => void
+  onEditClick?: (taskId: string) => void
+}
+
 // Fallback UI when the initial fetch fails. useTasks doesn't currently
 // expose a `refetch()` callback — the simplest escape hatch is a full
 // page reload. If granular retry becomes important later, expose
@@ -29,10 +36,10 @@ function BoardError({ error }: { error: Error }) {
 // (todo → in_progress → in_review → done). Each column gets its own
 // pre-filtered tasks slice; sorting by position happens inside Column.
 //
-// Step 4 doesn't pass onAddTask — Step 5 will wire it to TaskModal.
-// Drag-and-drop wraps in Step 6 via a SortableTaskCard HOC; TaskBoard
-// itself stays dnd-agnostic until then.
-export function TaskBoard() {
+// onAddTask / onEditClick are pass-through to Column / TaskCard. Both
+// optional so TaskBoard can be rendered without the modal infrastructure
+// (Step 4 did this).
+export function TaskBoard({ onAddTask, onEditClick }: Props) {
   const { tasks, loading, error } = useTasks()
 
   // Error short-circuits the board. useTasks only sets `error` on initial
@@ -63,6 +70,8 @@ export function TaskBoard() {
           status={status}
           tasks={tasksByStatus[status]}
           loading={loading}
+          onAddTask={onAddTask}
+          onEditClick={onEditClick}
         />
       ))}
     </div>

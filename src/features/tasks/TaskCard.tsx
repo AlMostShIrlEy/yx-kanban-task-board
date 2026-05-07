@@ -3,7 +3,7 @@ import { AvatarBubble } from '../../components/AvatarBubble'
 import { DueDateBadge } from '../../components/DueDateBadge'
 import { TagPill } from '../../components/TagPill'
 import { cn } from '../../lib/cn'
-import type { CardColor, Task } from '../../types'
+import type { CardColor, Priority, Task } from '../../types'
 import { CARD_COLORS } from '../../types'
 
 interface Props {
@@ -23,6 +23,15 @@ const CARD_COLOR_CLASSES: Record<CardColor, string> = {
   orange: 'bg-card-orange-bg text-card-orange-fg',
   green:  'bg-card-green-bg text-card-green-fg',
   yellow: 'bg-card-yellow-bg text-card-yellow-fg',
+}
+
+// Priority emoji indicator — only rendered for non-normal priority.
+// Most tasks are normal, so most cards stay visually quiet (no emoji noise).
+// aria-label gives screen readers the semantic word; emoji glyphs read poorly.
+const PRIORITY_EMOJI: Record<Priority, string | null> = {
+  high: '🔥',
+  normal: null,
+  low: '💤',
 }
 
 // Hash task.id to a stable color when task.color is null. Same pattern
@@ -91,8 +100,21 @@ export function TaskCard({ task, className, onEditClick }: Props) {
         </div>
       )}
 
-      {/* Title — color 继承自卡 fg;leading-tight 让多行 title 也紧凑 */}
-      <h3 className="text-base font-semibold leading-tight">{task.title}</h3>
+      {/* Title — color 继承自卡 fg;leading-tight 让多行 title 也紧凑;
+          high/low priority 在 title 前加 emoji(normal 不渲染)。
+          flex + items-baseline + shrink-0 比 inline span margin 跨浏览器
+          更稳;baseline 让 emoji 跟 title 文字基线对齐(不是顶对齐)。 */}
+      <div className="flex items-baseline gap-1.5">
+        {PRIORITY_EMOJI[task.priority] && (
+          <span
+            aria-label={`${task.priority} priority`}
+            className="shrink-0"
+          >
+            {PRIORITY_EMOJI[task.priority]}
+          </span>
+        )}
+        <h3 className="text-base font-semibold leading-tight">{task.title}</h3>
+      </div>
 
       {/* Note — text-slate-500 显式 override 卡 fg,跟 title 形成层级;
           line-clamp-3 防止过长 note 把卡撑得过高(Tailwind v4 原生支持) */}
