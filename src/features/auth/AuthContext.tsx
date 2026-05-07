@@ -1,6 +1,7 @@
 import { createContext, useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
+import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { seedDemoData } from './seedDemoData'
 
@@ -44,6 +45,13 @@ export function AuthProvider({ children }: Props) {
   // belt and suspenders.
   const seedAttemptedRef = useRef(false)
 
+  // seedInFlightRef: true while a seedDemoData Promise is mid-flight.
+  // Used to keep loading=true across StrictMode's double-mount: if the
+  // first mount kicked off seed and the second mount's INITIAL_SESSION
+  // arrives while seed is still running, we must NOT release loading
+  // early — the Promise's .finally will do it when seed completes.
+  const seedInFlightRef = useRef(false)
+
   const initialize = useCallback(async () => {
     setLoading(true)
     setError(null)
@@ -83,26 +91,53 @@ export function AuthProvider({ children }: Props) {
       if (!mounted) return
       setSession(newSession)
       setUser(newSession?.user ?? null)
-      // Only stop loading when we have a real session OR an explicit
-      // sign-out. INITIAL_SESSION + null session means "we're about to
-      // sign you in" — still loading.
-      if (newSession || event === 'SIGNED_OUT') {
-        setLoading(false)
-      }
       if (newSession) setError(null)
 
-      // Trigger demo seed in the background — covers both SIGNED_IN
-      // (first-time sign-up) and INITIAL_SESSION (page reload with an
-      // existing session). The latter supports "self-heal on next sign-in
-      // if the previous seed failed". Doesn't block setLoading; the UI
-      // has already transitioned to ready in the main flow.
+      // Explicit sign-out → release loading immediately.
+      if (event === 'SIGNED_OUT') {
+        setLoading(false)
+        return
+      }
+
+      // INITIAL_SESSION with no session means "no session yet, signing
+      // in momentarily" — keep loading=true and wait for SIGNED_IN.
+      if (!newSession) return
+
+      // First-time anonymous user: trigger seed BEFORE releasing
+      // loading so the board's first fetch sees populated data
+      // (otherwise: empty board flashes for ~500ms-1s, requiring a
+      // refresh — diagnosed in PLAN.md §10 backlog).
+      // For returning anon users, seedDemoData's first-line idempotent
+      // check (has_seeded === true) returns immediately → .finally
+      // fires in the next microtask → no perceptible delay.
+      // seedInFlightRef gates against the StrictMode case where the
+      // second mount's INITIAL_SESSION arrives while the first mount's
+      // seed is still running — we must NOT release loading early in
+      // the else branch.
       if (
-        newSession?.user?.is_anonymous &&
+        newSession.user.is_anonymous &&
         !seedAttemptedRef.current &&
         isMountedRef.current
       ) {
         seedAttemptedRef.current = true
-        void seedDemoData(newSession.user, isMountedRef)
+        seedInFlightRef.current = true
+        seedDemoData(newSession.user, isMountedRef)
+          .then((ok) => {
+            if (!ok && isMountedRef.current) {
+              toast.error(
+                "Couldn't load demo data. You can still create tasks."
+              )
+            }
+          })
+          .finally(() => {
+            seedInFlightRef.current = false
+            if (isMountedRef.current) setLoading(false)
+          })
+      } else if (!seedInFlightRef.current) {
+        // Not anonymous OR seed already attempted/completed in this
+        // lifecycle. If seed is still in flight from a previous mount
+        // (StrictMode), the Promise's .finally will release loading.
+        setLoading(false)
       }
     })
 

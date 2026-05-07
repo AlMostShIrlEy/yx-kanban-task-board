@@ -71,7 +71,11 @@ export function applyFiltersAndSearch(
   }
 
   if (filters.dueRange !== 'all') {
-    result = result.filter((t) => matchesDueRange(t, filters.dueRange))
+    // Hoist the narrowed value to a const — TS doesn't carry property
+    // narrowing (`filters.dueRange !== 'all'`) into closures, since the
+    // object could in theory be mutated before the callback runs.
+    const range = filters.dueRange
+    result = result.filter((t) => matchesDueRange(t, range))
   }
 
   return result

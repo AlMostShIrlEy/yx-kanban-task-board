@@ -94,9 +94,15 @@ interface MountRef {
 //
 // Writes demo data into the current anonymous user's board.
 //
+// Return value:
+//   • true  — seed succeeded, OR was a no-op (has_seeded already set,
+//     or aborted via isMounted check after the component unmounted).
+//   • false — seed FAILED partway through. Caller should surface a
+//     toast so the user knows demo data didn't load.
+//
 // Idempotency:
-//   • First check: user.user_metadata.has_seeded === true → return
-//     immediately, saving a round-trip.
+//   • First check: user.user_metadata.has_seeded === true → return true
+//     (no-op), saving a round-trip.
 //   • Second check: labels use ON CONFLICT (user_id, name) DO NOTHING
 //     (supabase-js's upsert + ignoreDuplicates); task_labels use
 //     ON CONFLICT (task_id, label_id) DO NOTHING. Retries don't produce
@@ -112,19 +118,20 @@ interface MountRef {
 //     re-enters the seed flow.
 //
 // Error policy:
-//   • catch everything, log via console.error, **do NOT throw** —
-//     never block the app.
+//   • catch everything, log via console.error, return false on failure.
+//     Never throws — caller's .then/.finally chain handles UI.
 //
 // MountRef checks:
 //   • Re-check isMounted.current before each await so the function
-//     stops issuing requests after the component unmounts.
+//     stops issuing requests after the component unmounts. Aborted
+//     paths return true (no error to surface; user is gone anyway).
 //
 export async function seedDemoData(
   user: User,
   isMounted: MountRef = { current: true }
-): Promise<void> {
+): Promise<boolean> {
   // First check: skip if metadata already marked
-  if (user.user_metadata?.has_seeded === true) return
+  if (user.user_metadata?.has_seeded === true) return true
 
   try {
     // ─── Step 1: ensure the 5 labels exist (idempotent upsert)
@@ -133,14 +140,14 @@ export async function seedDemoData(
       name: l.name,
       color: l.color,
     }))
-    if (!isMounted.current) return
+    if (!isMounted.current) return true
     const { error: labelErr } = await supabase
       .from('labels')
       .upsert(labelRows, { onConflict: 'user_id,name', ignoreDuplicates: true })
     if (labelErr) throw labelErr
 
     // ─── Step 2: read the 5 labels back to grab IDs (whether new or pre-existing)
-    if (!isMounted.current) return
+    if (!isMounted.current) return true
     const { data: labels, error: selErr } = await supabase
       .from('labels')
       .select('id, name')
@@ -171,7 +178,7 @@ export async function seedDemoData(
       due_date: t.dueOffset === null ? null : relativeDate(t.dueOffset),
       position: t.position,
     }))
-    if (!isMounted.current) return
+    if (!isMounted.current) return true
     const { data: tasks, error: taskErr } = await supabase
       .from('tasks')
       .insert(taskRows)
@@ -194,7 +201,7 @@ export async function seedDemoData(
       }))
     )
     if (taskLabelRows.length > 0) {
-      if (!isMounted.current) return
+      if (!isMounted.current) return true
       const { error: tlErr } = await supabase
         .from('task_labels')
         .upsert(taskLabelRows, {
@@ -206,7 +213,7 @@ export async function seedDemoData(
 
     // ─── Step 5: write has_seeded (LAST — if anything before fails, flag
     // stays unset and the next sign-in self-heals)
-    if (!isMounted.current) return
+    if (!isMounted.current) return true
     const { error: updateErr } = await supabase.auth.updateUser({
       data: { has_seeded: true },
     })
@@ -217,7 +224,9 @@ export async function seedDemoData(
         `[seedDemoData] Seeded ${tasks.length} tasks and ${labels.length} labels for guest user ${user.id.slice(0, 8)}`
       )
     }
+    return true
   } catch (err) {
     console.error('[seedDemoData] failed:', err)
+    return false
   }
 }
