@@ -4,9 +4,11 @@ import { Inbox } from 'lucide-react'
 // icon signals "intentional empty space" without competing with real
 // task cards' pastel weight.
 //
-// icon 色用 text-slate-300(比文字 text-slate-400 还浅一档)。
-// icon 视觉重量天然大于同号字,降权才不抢戏。
-// padding py-6(不是 py-8)给 icon 留垂直空间但不让占位过高。
+// Icon uses text-slate-300 (one shade lighter than the text-slate-400
+// caption). Icons carry more visual weight than text at the same shade,
+// so the icon needs to be downweighted to avoid stealing focus.
+// padding py-6 (not py-8) leaves vertical room for the icon without
+// making the placeholder too tall.
 export function EmptyState() {
   return (
     <div className="rounded-2xl border-2 border-dashed border-slate-200 px-4 py-6 text-center">

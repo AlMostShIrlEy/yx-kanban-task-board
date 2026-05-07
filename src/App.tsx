@@ -42,13 +42,15 @@ function AppContent() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      {/* Header — flex justify-between: 左 HelloUser, 右 + Create task button */}
+      {/* Header — flex justify-between: HelloUser on the left,
+          + Create task button on the right */}
       <header className="flex items-center justify-between px-6 py-4">
         <HelloUser />
         <button
           type="button"
           onClick={() => openCreate()}
-          // bg-action = #0F172A (slate-900) per @theme;rounded-xl 跟设计 spec 一致
+          // bg-action = #0F172A (slate-900) per @theme; rounded-xl matches
+          // the design spec
           className="inline-flex items-center gap-2 rounded-xl bg-action px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-700"
         >
           <Plus className="h-4 w-4" />
@@ -56,8 +58,9 @@ function AppContent() {
         </button>
       </header>
 
-      {/* main 占剩余高度;父级不限制 overflow,让 TaskBoard 内部
-          的 overflow-x-auto 单独负责列横滚。pb-6 留底部呼吸。 */}
+      {/* main fills the remaining height; the parent doesn't constrain
+          overflow, so TaskBoard's own overflow-x-auto handles column
+          horizontal scroll. pb-6 leaves breathing room at the bottom. */}
       <main className="flex-1 px-6 pb-6">
         <TaskBoard onAddTask={openCreate} onEditClick={openEdit} />
       </main>

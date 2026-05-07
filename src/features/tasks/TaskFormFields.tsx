@@ -19,7 +19,7 @@ const PRIORITY_LABELS: Record<Priority, string> = {
   high: 'High',
 }
 
-// 共享 input/select/textarea 类:slate 边框 + focus ring
+// Shared input/select/textarea class: slate border + focus ring.
 const inputClass =
   'w-full rounded-xl border border-slate-200 px-3 py-2 text-sm transition-colors focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200'
 
@@ -125,7 +125,7 @@ export function TaskFormFields({
   )
 }
 
-// Field wrapper — label + a11y htmlFor 配对 + required asterisk。
+// Field wrapper — label + a11y htmlFor pairing + required asterisk.
 function Field({
   label,
   htmlFor,

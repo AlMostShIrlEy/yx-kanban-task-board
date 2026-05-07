@@ -132,17 +132,21 @@ function TaskModalContent({
       ref={dialogRef}
       onClick={handleDialogClick}
       aria-labelledby="task-modal-title"
-      // p-0 重置浏览器默认 padding;backdrop:* 是 Tailwind v4 的 ::backdrop
-      // pseudo 修饰符。dialog 自身保持 block display:UA 的 fixed/inset/
-      // margin:auto 居中算法依赖 block 才能可靠生效。flex 容器下放到内层
-      // div,避免 display:flex 干扰 dialog 自身的居中定位。
-      // m-auto 显式恢复 margin:auto — Tailwind v4 preflight 把所有元素 margin
-      // 重置为 0,覆盖了 UA <dialog> 的 margin:auto 居中行为(详见 PLAN.md §10
-      // backlog)。inset:0 + margin:auto 才能让 dialog 在视口中心。
+      // p-0 resets the browser's default padding; backdrop:* is Tailwind
+      // v4's ::backdrop pseudo-element modifier. The dialog itself stays
+      // display:block — the UA's fixed/inset/margin:auto centering algorithm
+      // only works reliably on block-level dialogs, so the flex container
+      // is moved to an inner div to avoid display:flex interfering with
+      // the dialog's own centering.
+      // m-auto explicitly restores margin:auto — Tailwind v4 preflight
+      // resets margin to 0 on every element, overriding the UA's
+      // margin:auto centering for <dialog> (see PLAN.md §10 backlog).
+      // inset:0 + margin:auto is what centers the dialog in the viewport.
       className="m-auto w-full max-w-lg rounded-2xl bg-white p-0 shadow-2xl backdrop:bg-slate-900/40 backdrop:backdrop-blur-sm"
     >
-      {/* 内层 flex 容器:max-h + flex-col 让 body 区域内滚,header/footer
-          固定上下,而不是整个 dialog 一起滚。 */}
+      {/* Inner flex container: max-h + flex-col let the body region scroll
+          internally with header/footer pinned, instead of the whole dialog
+          scrolling as one block. */}
       <div className="flex max-h-[90vh] flex-col">
         <div className="border-b border-slate-100 px-6 py-4">
           <h2

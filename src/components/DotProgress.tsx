@@ -27,7 +27,7 @@ export function DotProgress({
 
   return (
     <div
-      // gap-1 = 4px 圆点间距,跟 w-2/h-2 (8px) 直径配比看起来均匀
+      // gap-1 = 4px between dots, balanced against the w-2/h-2 (8px) diameter.
       className={cn('flex items-center gap-1', className)}
       role="progressbar"
       aria-valuenow={clamped}
@@ -38,7 +38,7 @@ export function DotProgress({
         <div
           key={i}
           className={cn(
-            // 8px 正圆点(w-2 h-2 + rounded-full),CLAUDE.md 指定尺寸
+            // 8px circle (w-2 h-2 + rounded-full); size mandated by CLAUDE.md.
             'h-2 w-2 rounded-full',
             i < filledCount ? filledClassName : unfilledClassName
           )}

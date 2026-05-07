@@ -4,9 +4,9 @@ import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '../../lib/supabase'
 import { seedDemoData } from './seedDemoData'
 
-// AuthContextValue — 消费方能从 context 读到的所有状态。
-// loading 在首次加载时为 true,直到从 storage 恢复出 session,或者
-// 匿名 sign-in 成功之前。
+// AuthContextValue — every piece of auth state consumers can read off
+// the context. `loading` is true on first mount until either an existing
+// session is restored from storage OR an anonymous sign-in succeeds.
 export interface AuthContextValue {
   user: User | null
   session: Session | null
@@ -14,7 +14,7 @@ export interface AuthContextValue {
   error: Error | null
 }
 
-// 默认值给 null,这样 useAuth 可以检测"组件不在 Provider 内"并抛错。
+// Default null lets useAuth detect "not in Provider" and throw cleanly.
 export const AuthContext = createContext<AuthContextValue | null>(null)
 
 interface Props {
@@ -27,17 +27,21 @@ export function AuthProvider({ children }: Props) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
 
-  // initRef 守卫 React 18 StrictMode 的双 mount(dev 下 effect 会跑两次)。
-  // 没有它,signInAnonymously() 会在每次冷启动创建两个幽灵匿名用户。
+  // initRef guards against React 18 StrictMode double-mount (the effect
+  // runs twice in dev). Without it, signInAnonymously() would create two
+  // ghost anonymous users on every cold start.
   const initRef = useRef(false)
 
-  // isMountedRef 让后台任务(seedDemoData)能在每个 await 前自检,组件卸载
-  // 后跳出循环、不再发请求。
+  // isMountedRef lets background work (seedDemoData) self-check before
+  // each await and bail out when the component unmounts, avoiding stray
+  // network requests after teardown.
   const isMountedRef = useRef(true)
 
-  // seedAttemptedRef 防止 seed 在同一组件生命周期里被多个 auth 事件
-  // (INITIAL_SESSION + SIGNED_IN + USER_UPDATED) 重复触发。seedDemoData
-  // 内部还有 has_seeded 二次幂等,这是双保险。
+  // seedAttemptedRef prevents seed from being triggered multiple times
+  // within a single component lifecycle by overlapping auth events
+  // (INITIAL_SESSION + SIGNED_IN + USER_UPDATED). seedDemoData also
+  // checks has_seeded internally as a second idempotency layer —
+  // belt and suspenders.
   const seedAttemptedRef = useRef(false)
 
   const initialize = useCallback(async () => {
@@ -49,11 +53,13 @@ export function AuthProvider({ children }: Props) {
       if (!data.session) {
         const { error: signErr } = await supabase.auth.signInAnonymously()
         if (signErr) throw signErr
-        // 不在这里 setLoading(false);等 onAuthStateChange 的 SIGNED_IN
-        // 事件携带新 session 一起把状态更新完整,避免出现 user=null 但 loading=false
-        // 的中间态。
+        // Don't setLoading(false) here; wait for onAuthStateChange's
+        // SIGNED_IN event to deliver the new session along with the
+        // state update, avoiding a transient `user=null && loading=false`
+        // window.
       }
-      // 已有 session 的情况:onAuthStateChange 的 INITIAL_SESSION 已经更新过 state。
+      // Existing session path: onAuthStateChange's INITIAL_SESSION has
+      // already updated state.
     } catch (err) {
       setError(err instanceof Error ? err : new Error(String(err)))
       setLoading(false)
@@ -61,31 +67,35 @@ export function AuthProvider({ children }: Props) {
   }, [])
 
   useEffect(() => {
-    // StrictMode 下 effect 会跑两次,cleanup 把 isMountedRef 置 false。
-    // 在 effect 入口重新置 true,确保第二次 mount 后 seed 还能跑。
+    // StrictMode runs the effect twice; the cleanup sets isMountedRef
+    // to false. Reset to true at effect entry so seed can still run on
+    // the second mount.
     isMountedRef.current = true
     let mounted = true
 
-    // 订阅所有 auth 状态变化。订阅创建时会立即触发 INITIAL_SESSION 事件
-    // 携带当前 session(可能为 null)。SIGNED_IN/SIGNED_OUT/TOKEN_REFRESHED
-    // 等会在后续状态切换时触发。
+    // Subscribe to all auth state changes. Subscription creation
+    // immediately fires INITIAL_SESSION with the current session
+    // (possibly null). SIGNED_IN/SIGNED_OUT/TOKEN_REFRESHED etc. fire
+    // on subsequent transitions.
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, newSession) => {
       if (!mounted) return
       setSession(newSession)
       setUser(newSession?.user ?? null)
-      // 只在拿到真实 session 或者明确登出时才停止 loading。
-      // INITIAL_SESSION + null session 表示"我们正要给你登录",此刻还在加载。
+      // Only stop loading when we have a real session OR an explicit
+      // sign-out. INITIAL_SESSION + null session means "we're about to
+      // sign you in" — still loading.
       if (newSession || event === 'SIGNED_OUT') {
         setLoading(false)
       }
       if (newSession) setError(null)
 
-      // 后台触发 demo seed —— 同时覆盖 SIGNED_IN(首次签入)和
-      // INITIAL_SESSION(已有 session 的 page reload)两种情形。
-      // 后者支持"上次 seed 失败时下次登录自愈"。
-      // 不阻塞 setLoading,UI 已在主流程里转入 ready 态。
+      // Trigger demo seed in the background — covers both SIGNED_IN
+      // (first-time sign-up) and INITIAL_SESSION (page reload with an
+      // existing session). The latter supports "self-heal on next sign-in
+      // if the previous seed failed". Doesn't block setLoading; the UI
+      // has already transitioned to ready in the main flow.
       if (
         newSession?.user?.is_anonymous &&
         !seedAttemptedRef.current &&
@@ -113,8 +123,9 @@ export function AuthProvider({ children }: Props) {
   }, [initialize])
 
   // ─── Loading state ───
-  // 居中柔和的"正在登录"。不放 spinner —— 文字 "Signing you in…" 配 Inter
-  // 比通用 loader 更贴合设计语言,避免视觉噪声。
+  // Centered, soft "Signing you in…" text. No spinner — the wording in
+  // Inter feels more on-brand than a generic loader and avoids visual
+  // noise.
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -144,9 +155,11 @@ export function AuthProvider({ children }: Props) {
     )
   }
 
-  // 防御:理论上 loading=false 时 user 应该非空(我们的应用始终匿名登录),
-  // 但若发生 SIGNED_OUT 后 user=null,继续显示 loading 文案而不是把 null
-  // 暴露给 children,免得下游每个组件都得自己判空。
+  // Defensive: when loading=false, user should be non-null in theory
+  // (our app always signs in anonymously). But if a SIGNED_OUT happens
+  // and leaves user=null, keep showing the loading copy rather than
+  // exposing null to children — saves every downstream component from
+  // needing its own null check.
   if (!user || !session) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">

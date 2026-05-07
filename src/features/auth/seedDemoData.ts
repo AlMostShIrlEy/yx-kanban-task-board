@@ -11,9 +11,9 @@ const LABELS = [
   { name: 'Bug',      color: 'orange' },
 ] as const
 
-// SeedTask 的字段映射:
-//   dueOffset = null            → due_date NULL
-//   dueOffset = 整数(可正可负) → CURRENT_DATE + N days
+// SeedTask field mapping:
+//   dueOffset = null          → due_date NULL
+//   dueOffset = integer (±)   → CURRENT_DATE + N days
 type SeedTask = {
   title: string
   status: 'todo' | 'in_progress' | 'in_review' | 'done'
@@ -70,9 +70,11 @@ const TASKS: SeedTask[] = [
   },
 ]
 
-// 用本地时区算"今天 + N 天",输出 YYYY-MM-DD 字符串。
-// 不用 toISOString().slice(0,10) 是因为后者按 UTC 切日期,远离 UTC 的时区
-// 会把"昨天/明天"算成"今天"。Postgres date 列存的是日历日,本地时区更合理。
+// Compute "today + N days" in the user's LOCAL timezone, formatted as
+// YYYY-MM-DD. Avoids toISOString().slice(0,10) because that converts to
+// UTC first, so timezones far from UTC would shift "yesterday/tomorrow"
+// to "today". Postgres `date` columns store calendar days, so local time
+// is the right reference frame.
 function relativeDate(daysOffset: number): string {
   const d = new Date()
   d.setDate(d.getDate() + daysOffset)
@@ -82,43 +84,50 @@ function relativeDate(daysOffset: number): string {
   return `${yyyy}-${mm}-${dd}`
 }
 
-// readonly 形式让 seed 函数无法误改 mount 标志,只能读取。
+// readonly form means the seed function can only READ the mount flag,
+// never accidentally flip it.
 interface MountRef {
   readonly current: boolean
 }
 
 // ─── Seed function ────────────────────────────────────────────────────
 //
-// 给当前匿名用户的看板写入 demo 数据。
+// Writes demo data into the current anonymous user's board.
 //
-// 幂等性:
-//   • 首检:user.user_metadata.has_seeded === true 时直接 return,免一次往返
-//   • 二检:labels 用 ON CONFLICT (user_id, name) DO NOTHING(supabase-js 的
-//     upsert + ignoreDuplicates),task_labels 用 ON CONFLICT (task_id, label_id)
-//     DO NOTHING。重试不会产生重复
-//   • ⚠️ tasks 表没有除 id 外的 unique 约束 → 无法 ON CONFLICT。一旦 partial
-//     fail 后重试,可能产生重复 task。MVP 规模可接受;Phase 4 真上线前可以加
-//     一个 (user_id, title) 的 partial unique constraint 收紧
+// Idempotency:
+//   • First check: user.user_metadata.has_seeded === true → return
+//     immediately, saving a round-trip.
+//   • Second check: labels use ON CONFLICT (user_id, name) DO NOTHING
+//     (supabase-js's upsert + ignoreDuplicates); task_labels use
+//     ON CONFLICT (task_id, label_id) DO NOTHING. Retries don't produce
+//     duplicates.
+//   • ⚠️ The tasks table has no unique constraint beyond id → no
+//     ON CONFLICT possible. A partial-failure retry could produce
+//     duplicate tasks. Acceptable at MVP scale; before Phase 4 launch
+//     consider adding a (user_id, title) partial unique constraint.
 //
-// 自愈:
-//   • has_seeded 标志在最后一步才写入 → 中间任何一步失败,标志不会被设,
-//     下次 page reload 触发的 INITIAL_SESSION 会再次进入 seed 流程
+// Self-heal:
+//   • has_seeded is written LAST → if any earlier step fails, the flag
+//     stays unset and the next page-reload-triggered INITIAL_SESSION
+//     re-enters the seed flow.
 //
-// 错误策略:
-//   • 全部 catch,console.error 打日志,**不 throw** —— 不阻塞应用
+// Error policy:
+//   • catch everything, log via console.error, **do NOT throw** —
+//     never block the app.
 //
-// MountRef 检查:
-//   • 每个 await 之前过一遍 isMounted.current,组件卸载后停止后续请求
+// MountRef checks:
+//   • Re-check isMounted.current before each await so the function
+//     stops issuing requests after the component unmounts.
 //
 export async function seedDemoData(
   user: User,
   isMounted: MountRef = { current: true }
 ): Promise<void> {
-  // 首检:metadata 已标记过就跳过
+  // First check: skip if metadata already marked
   if (user.user_metadata?.has_seeded === true) return
 
   try {
-    // ─── Step 1: 确保 5 个 labels 存在(幂等 upsert)
+    // ─── Step 1: ensure the 5 labels exist (idempotent upsert)
     const labelRows = LABELS.map((l) => ({
       user_id: user.id,
       name: l.name,
@@ -130,7 +139,7 @@ export async function seedDemoData(
       .upsert(labelRows, { onConflict: 'user_id,name', ignoreDuplicates: true })
     if (labelErr) throw labelErr
 
-    // ─── Step 2: 把 5 个 labels 读回来拿 ID(无论是否新插)
+    // ─── Step 2: read the 5 labels back to grab IDs (whether new or pre-existing)
     if (!isMounted.current) return
     const { data: labels, error: selErr } = await supabase
       .from('labels')
@@ -151,7 +160,7 @@ export async function seedDemoData(
       labels.map((l) => [l.name, l.id])
     )
 
-    // ─── Step 3: 插入 7 个 tasks(无 ON CONFLICT,见函数顶注释 ⚠️)
+    // ─── Step 3: insert the 7 tasks (no ON CONFLICT — see ⚠️ at top of fn)
     const taskRows = TASKS.map((t) => ({
       user_id: user.id,
       title: t.title,
@@ -177,7 +186,7 @@ export async function seedDemoData(
       tasks.map((t) => [t.title, t.id])
     )
 
-    // ─── Step 4: 插入 task_labels join 行(幂等 upsert)
+    // ─── Step 4: insert task_labels join rows (idempotent upsert)
     const taskLabelRows = TASKS.flatMap((t) =>
       t.labels.map((labelName) => ({
         task_id: taskByTitle[t.title],
@@ -195,7 +204,8 @@ export async function seedDemoData(
       if (tlErr) throw tlErr
     }
 
-    // ─── Step 5: 写 has_seeded(LAST — 中途失败不会标记,下次自愈)
+    // ─── Step 5: write has_seeded (LAST — if anything before fails, flag
+    // stays unset and the next sign-in self-heals)
     if (!isMounted.current) return
     const { error: updateErr } = await supabase.auth.updateUser({
       data: { has_seeded: true },

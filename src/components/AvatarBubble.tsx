@@ -34,8 +34,8 @@ const COLOR_CLASSES: Record<AvatarColor, string> = {
 }
 
 const SIZE_CLASSES: Record<'sm' | 'md', string> = {
-  sm: 'h-8 w-8 text-xs',     // 32px,TaskCard footer 用
-  md: 'h-10 w-10 text-sm',   // 40px,header / 强调位置备用
+  sm: 'h-8 w-8 text-xs',     // 32px, used in TaskCard footer
+  md: 'h-10 w-10 text-sm',   // 40px, reserved for headers / emphasis spots
 }
 
 // Pick a stable color for a given userId. UUIDs are random so the first
@@ -59,14 +59,15 @@ export function AvatarBubble({ userId, size = 'sm', className }: Props) {
   return (
     <div
       className={cn(
-        // 圆形 + 居中文字 + 加粗;靠 bg 区分,无边框
+        // Circle + centered text + bold; differentiation comes from bg,
+        // no border needed.
         'inline-flex items-center justify-center rounded-full font-semibold',
         SIZE_CLASSES[size],
         COLOR_CLASSES[color],
         className
       )}
-      // 2 字符 hex 没语义价值,用 aria-label / title 告诉辅助技术
-      // 这是个用户头像而不是装饰性 badge。
+      // The 2-char hex has no semantic value; aria-label / title tell
+      // assistive tech this is a user avatar, not a decorative badge.
       aria-label={`Guest user ${initials}`}
       title={`Guest ${initials}`}
     >

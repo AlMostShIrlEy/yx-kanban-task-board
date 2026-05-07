@@ -32,8 +32,9 @@ export function TagPill({ color, children, className }: Props) {
   return (
     <span
       className={cn(
-        // 圆角药丸 + 紧凑 padding + 小号粗体,跟设计参考 #tag 节奏一致;
-        // inline-flex 让父级排版能 wrap、能跟 icon 并排
+        // Rounded pill + compact padding + small bold text, matching the
+        // #tag rhythm in the design reference; inline-flex lets parent
+        // layouts wrap and place icons inline.
         'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
         COLOR_CLASSES[color],
         className

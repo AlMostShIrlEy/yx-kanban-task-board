@@ -18,20 +18,25 @@ export function TaskCardSkeleton({ className }: Props) {
       className={cn('rounded-2xl bg-slate-100 p-4 shadow-sm', className)}
       aria-hidden="true"
     >
-      {/* Pills 行 — 2 个 pill-shape 占位(模拟典型卡片有 1-2 个 label) */}
+      {/* Pills row — 2 pill-shape placeholders (mimicking the typical
+          card with 1-2 labels). */}
       <div className="mb-3 flex gap-1">
         <Skeleton className="h-5 w-16 rounded-full" />
         <Skeleton className="h-5 w-12 rounded-full" />
       </div>
 
-      {/* Title — 2 行短条,模拟"标题占 1-2 行"的真实形态 */}
+      {/* Title — 2 short bars, mimicking the "title takes 1-2 lines"
+          common case. */}
       <Skeleton className="h-4 w-4/5 rounded" />
       <Skeleton className="mt-1.5 h-4 w-3/5 rounded" />
 
-      {/* Note — 单行长条,模拟典型 1-2 句的 note(部分卡有 note,这里默认渲染) */}
+      {/* Note — single full-width bar, mimicking the typical 1-2
+          sentence note (some cards have notes, some don't; we render
+          one by default). */}
       <Skeleton className="mt-3 h-3 w-full rounded" />
 
-      {/* Footer — 左 avatar(8x8 圆),右 2 个 chip(due-date pill + label-count pill) */}
+      {/* Footer — avatar (8x8 circle) on the left, 2 chips on the right
+          (due-date pill + label-count pill). */}
       <div className="mt-4 flex items-center justify-between">
         <Skeleton className="h-8 w-8 rounded-full" />
         <div className="flex gap-2">

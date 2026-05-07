@@ -72,7 +72,8 @@ export function DueDateBadge({ dueDate, className }: Props) {
   return (
     <span
       className={cn(
-        // 紧凑 inline-flex + 小号 + 圆角药丸 + leading icon 增加视觉锚点
+        // Compact inline-flex + small text + rounded pill + leading icon
+        // for visual anchoring.
         'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
         SEVERITY_CLASSES[severity],
         className

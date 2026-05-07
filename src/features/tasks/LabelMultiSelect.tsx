@@ -40,8 +40,10 @@ export function LabelMultiSelect({
             type="button"
             onClick={() => onToggle(label.id)}
             aria-pressed={isSelected}
-            // 整个 button 包 TagPill;未选中 opacity-40 让"可点"
-            // 未选中也保持可见,hover 升到 0.7 预览选中感
+            // The whole button wraps the TagPill; unselected chips drop
+            // to opacity-40 to signal "clickable but not active" while
+            // staying visible. Hover lifts to 0.7 to preview the
+            // selected look.
             className={cn(
               'rounded-full transition-opacity',
               !isSelected && 'opacity-40 hover:opacity-70'

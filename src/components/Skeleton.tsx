@@ -11,8 +11,9 @@ interface Props {
 // real component's layout.
 export function Skeleton({ className }: Props) {
   return (
-    // animate-pulse 给柔和呼吸感;bg-slate-200/70 略半透明,
-    // 在浅色 / 深色卡片上都能保持视觉柔和而不刺眼。
+    // animate-pulse adds a soft breathing effect; bg-slate-200/70 is
+    // semi-transparent so it stays visually soft on both light and
+    // dark cards without becoming harsh.
     <div className={cn('animate-pulse bg-slate-200/70', className)} />
   )
 }

@@ -35,7 +35,8 @@ export function ColorPicker({ value, onChange }: Props) {
           aria-label={color}
           onClick={() => onChange(color)}
           className={cn(
-            // 圆形 swatch + ring 选中态;hover 给浅 ring 预览
+            // Circular swatch + ring on selected state; hover shows a
+            // light preview ring.
             'h-8 w-8 rounded-full transition-shadow',
             SWATCH_BG[color],
             value === color
