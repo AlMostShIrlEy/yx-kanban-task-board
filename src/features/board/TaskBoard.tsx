@@ -18,6 +18,12 @@ import { STATUSES } from '../../types'
 import type { Status, Task } from '../../types'
 
 interface Props {
+  // tasks here is the already-filtered set (from App's
+  // applyFiltersAndSearch). Sub-step A passed unfiltered tasks; Sub-step B
+  // passes filtered. The component is symmetric over both — it just
+  // renders + drag-handles whatever it's given.
+  tasks: Task[]
+  hasActiveFilters: boolean
   onAddTask?: (status: Status) => void
   onEditClick?: (taskId: string) => void
 }
@@ -56,8 +62,19 @@ function BoardError({ error }: { error: Error }) {
 //     then calls useTasks.moveTask once. The optimistic helper inside
 //     useTasks reverts + toasts on failure — DnD layer needs no extra
 //     error handling.
-export function TaskBoard({ onAddTask, onEditClick }: Props) {
-  const { tasks, loading, error, moveTask } = useTasks()
+//
+// Filtered drag note: when filter is active, drag math operates on the
+// filtered set only. This means a dropped task's new position can land
+// "between" hidden tasks in raw position space — visible result is
+// correct, but clearing the filter may show unexpected ordering vs
+// hidden tasks. Acceptable MVP trade-off; logged in PLAN.md backlog.
+export function TaskBoard({
+  tasks,
+  hasActiveFilters,
+  onAddTask,
+  onEditClick,
+}: Props) {
+  const { loading, error, moveTask } = useTasks()
   // activeTask drives the DragOverlay rendering. null = no drag in progress.
   const [activeTask, setActiveTask] = useState<Task | null>(null)
 
@@ -105,13 +122,6 @@ export function TaskBoard({ onAddTask, onEditClick }: Props) {
     // already accounts for the in-progress visual reorder dnd-kit
     // applies during drag. Using this index keeps drop position
     // matching the visual placeholder the user sees.
-    //
-    // Earlier attempt: derive direction from rect centers ourselves.
-    // That was a second independent algorithm fighting dnd-kit's
-    // internal one → visual-vs-actual mismatch. Trusting dnd-kit fixes it.
-    //
-    // Type assertion: dnd-kit types `over.data.current` loosely; we
-    // narrow via a known shape.
     const overSortableIndex = (
       over.data.current as { sortable?: { index: number } } | undefined
     )?.sortable?.index
@@ -158,6 +168,7 @@ export function TaskBoard({ onAddTask, onEditClick }: Props) {
             status={status}
             tasks={tasksByStatus[status]}
             loading={loading}
+            hasActiveFilters={hasActiveFilters}
             onAddTask={onAddTask}
             onEditClick={onEditClick}
           />

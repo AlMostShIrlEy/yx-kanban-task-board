@@ -14,6 +14,7 @@ interface Props {
   status: Status
   tasks: Task[]                            // already filtered to this status by parent
   loading?: boolean
+  hasActiveFilters?: boolean               // search OR filter is active → EmptyState differentiates copy
   onAddTask?: (status: Status) => void     // omit → no + button (Step 5 wires this)
   onEditClick?: (taskId: string) => void   // pass-through to SortableTaskCard → TaskCard
 }
@@ -45,6 +46,7 @@ export function Column({
   status,
   tasks,
   loading,
+  hasActiveFilters,
   onAddTask,
   onEditClick,
 }: Props) {
@@ -107,7 +109,7 @@ export function Column({
             <TaskCardSkeleton key={i} />
           ))
         ) : sorted.length === 0 ? (
-          <EmptyState />
+          <EmptyState filtered={hasActiveFilters} />
         ) : (
           <SortableContext
             items={taskIds}
