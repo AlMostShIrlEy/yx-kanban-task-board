@@ -6,26 +6,18 @@ import { useAuth } from './features/auth/hooks/useAuth'
 import { TasksProvider } from './features/tasks/TasksProvider'
 import { useTasks } from './features/tasks/hooks/useTasks'
 import { TaskBoard } from './features/board/TaskBoard'
+import { Sidebar } from './features/board/Sidebar'
+import { StatsWidget } from './features/board/StatsWidget'
 import { TaskModal } from './features/tasks/TaskModal'
 import type { ModalState } from './features/tasks/TaskModal'
 import type { Status } from './types'
 
-function HelloUser() {
-  const { user } = useAuth()
-  if (!user) return null
-  return (
-    <div className="text-2xl font-semibold text-slate-900">
-      Hello, Guest{' '}
-      <span className="font-mono text-brand">{user.id.slice(0, 8)}</span>
-    </div>
-  )
-}
-
-// AppContent — needs useTasks (for openEdit task lookup) so it lives
-// inside <TasksProvider>. Owns modalState + threads callbacks down to
-// header button (Create task) and TaskBoard (per-column add + per-card
-// edit).
+// AppContent — needs useTasks (for openEdit task lookup, taskCount,
+// stats) and useAuth (for sidebar user card), so it lives inside both
+// providers. Owns modalState + threads callbacks down to header button
+// (Create task) and TaskBoard (per-column add + per-card edit).
 function AppContent() {
+  const { user } = useAuth()
   const { tasks } = useTasks()
   const [modalState, setModalState] = useState<ModalState | null>(null)
 
@@ -40,30 +32,49 @@ function AppContent() {
 
   const closeModal = () => setModalState(null)
 
-  return (
-    <div className="flex min-h-screen flex-col">
-      {/* Header — flex justify-between: HelloUser on the left,
-          + Create task button on the right */}
-      <header className="flex items-center justify-between px-6 py-4">
-        <HelloUser />
-        <button
-          type="button"
-          onClick={() => openCreate()}
-          // bg-action = #0F172A (slate-900) per @theme; rounded-xl matches
-          // the design spec
-          className="inline-flex items-center gap-2 rounded-xl bg-action px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-700"
-        >
-          <Plus className="h-4 w-4" />
-          Create task
-        </button>
-      </header>
+  // AuthProvider's contract: it doesn't render children until user is
+  // non-null. TS can't infer the contract; defensive narrow.
+  if (!user) return null
 
-      {/* main fills the remaining height; the parent doesn't constrain
-          overflow, so TaskBoard's own overflow-x-auto handles column
-          horizontal scroll. pb-6 leaves breathing room at the bottom. */}
-      <main className="flex-1 px-6 pb-6">
-        <TaskBoard onAddTask={openCreate} onEditClick={openEdit} />
-      </main>
+  // Header date label. Locale hard-coded to 'en-US' so the header reads
+  // consistently regardless of the browser's preferred language —
+  // matches the project's English-only convention.
+  const todayLabel = new Intl.DateTimeFormat('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(new Date())
+
+  return (
+    <div className="flex h-screen bg-slate-50">
+      <Sidebar taskCount={tasks.length} user={user}>
+        <StatsWidget />
+      </Sidebar>
+
+      {/* Main column — flex-1 fills remaining width; flex-col stacks
+          header above main; overflow-hidden delegates horizontal scroll
+          to TaskBoard's own overflow-x-auto. */}
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <header className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-4">
+          <div>
+            <p className="text-xs font-medium text-slate-400">Today</p>
+            <p className="text-base font-medium text-slate-900">{todayLabel}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => openCreate()}
+            className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-700"
+          >
+            <Plus className="h-4 w-4" />
+            Create task
+          </button>
+        </header>
+
+        <main className="flex-1 overflow-hidden p-6">
+          <TaskBoard onAddTask={openCreate} onEditClick={openEdit} />
+        </main>
+      </div>
 
       <TaskModal state={modalState} onClose={closeModal} />
     </div>
