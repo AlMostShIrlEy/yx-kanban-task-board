@@ -1,7 +1,13 @@
+import { useDroppable } from '@dnd-kit/core'
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
 import { Plus } from 'lucide-react'
-import { TaskCard } from '../tasks/TaskCard'
+import { SortableTaskCard } from './SortableTaskCard'
 import { TaskCardSkeleton } from '../tasks/TaskCardSkeleton'
 import { EmptyState } from './EmptyState'
+import { cn } from '../../lib/cn'
 import type { Status, Task } from '../../types'
 
 interface Props {
@@ -9,7 +15,7 @@ interface Props {
   tasks: Task[]                            // already filtered to this status by parent
   loading?: boolean
   onAddTask?: (status: Status) => void     // omit → no + button (Step 5 wires this)
-  onEditClick?: (taskId: string) => void   // pass-through to TaskCard
+  onEditClick?: (taskId: string) => void   // pass-through to SortableTaskCard → TaskCard
 }
 
 // Display labels for the 4 statuses. Centralised so renaming a column
@@ -26,31 +32,61 @@ const STATUS_LABELS: Record<Status, string> = {
 const SKELETON_COUNT = 3
 
 // Single Kanban column: header (title + count + optional add button)
-// + body (skeletons / EmptyState / TaskCards by position).
+// + body (skeletons / EmptyState / SortableTaskCards by position).
 //
-// Container has NO bg / border — visual grouping comes from header
-// + card stack alone, matching the reference design's flat column style.
-// EmptyState's dashed box is local decoration, not column container chrome.
-export function Column({ status, tasks, loading, onAddTask, onEditClick }: Props) {
-  // Sort by position ASC (LexoRank-lite). Don't mutate the input array
-  // — it's parent state, mutating would break React change detection.
+// dnd-kit roles:
+//   - Column itself = useDroppable (id `column-{status}`) — handles
+//     drops onto empty columns OR column blank space below cards
+//   - SortableContext wraps the card list — handles within-column
+//     reorder visuals (gap-closing animation while dragging)
+// EmptyState is purely visual; the Column's droppable is what actually
+// receives drops to empty columns.
+export function Column({
+  status,
+  tasks,
+  loading,
+  onAddTask,
+  onEditClick,
+}: Props) {
+  // Sort by position ASC (LexoRank-lite). Don't mutate the input —
+  // it's parent state, mutating would break React change detection.
   const sorted = [...tasks].sort((a, b) => a.position - b.position)
+  const taskIds = sorted.map((t) => t.id)
+
+  const { setNodeRef, isOver } = useDroppable({
+    id: `column-${status}`,
+    data: { type: 'column', status },
+  })
 
   return (
-    <div className="flex w-72 shrink-0 flex-col">
-      {/* Header — px-1 内缩跟卡片 p-4 视觉对齐;mb-3 跟列内卡片 gap-3 一致 */}
+    <div
+      ref={setNodeRef}
+      className={cn(
+        'flex w-72 shrink-0 flex-col rounded-xl transition-all duration-150',
+        // bg + ring combo (per Step 6 #7 align): area feel (soft bg) +
+        // boundary feel (subtle ring), the standard Linear pattern when
+        // dragging an issue to a different project. ring uses box-shadow
+        // under the hood → doesn't affect layout, doesn't conflict with
+        // cards.
+        isOver && 'bg-slate-100/50 ring-2 ring-slate-300/50'
+      )}
+    >
+      {/* Header — px-1 inset visually aligns with card p-4; mb-3 matches
+          the gap-3 between cards in the body */}
       <div className="mb-3 flex items-center justify-between px-1">
         <div className="flex items-center gap-2">
           <h2 className="text-sm font-semibold text-slate-900">
             {STATUS_LABELS[status]}
           </h2>
-          {/* Count 只在数据 ready 时显示;loading 时显示 "0" 会误导 */}
+          {/* Count is only shown when data is ready; showing "0" during
+              loading would mislead. */}
           {!loading && (
             <span className="text-sm text-slate-400">{tasks.length}</span>
           )}
         </div>
-        {/* + 按钮:仅在 onAddTask 传入时渲染。Step 4 不传 → 按钮不出现,
-            避免 "broken affordance"。Step 5 接 TaskModal 时启用。 */}
+        {/* + button: only rendered when onAddTask is passed. Step 4 doesn't
+            pass it → button hidden, avoiding a "broken affordance". Step 5
+            wires it up via TaskModal. */}
         {onAddTask && (
           <button
             type="button"
@@ -63,7 +99,8 @@ export function Column({ status, tasks, loading, onAddTask, onEditClick }: Props
         )}
       </div>
 
-      {/* Body — 三态:loading → skeletons / 空 → EmptyState / 有数据 → cards */}
+      {/* Body — three states: loading → skeletons / empty → EmptyState /
+          has data → sortable cards */}
       <div className="flex flex-col gap-3">
         {loading ? (
           Array.from({ length: SKELETON_COUNT }, (_, i) => (
@@ -72,9 +109,18 @@ export function Column({ status, tasks, loading, onAddTask, onEditClick }: Props
         ) : sorted.length === 0 ? (
           <EmptyState />
         ) : (
-          sorted.map((task) => (
-            <TaskCard key={task.id} task={task} onEditClick={onEditClick} />
-          ))
+          <SortableContext
+            items={taskIds}
+            strategy={verticalListSortingStrategy}
+          >
+            {sorted.map((task) => (
+              <SortableTaskCard
+                key={task.id}
+                task={task}
+                onEditClick={onEditClick}
+              />
+            ))}
+          </SortableContext>
         )}
       </div>
     </div>

@@ -62,16 +62,19 @@ export function TaskCard({ task, className, onEditClick }: Props) {
   return (
     <article
       className={cn(
-        // 软圆角 + 微阴影 + 内 padding;hover 时阴影加深 + 上抬 2px(CLAUDE.md spec)
+        // Soft rounded corners + subtle shadow + inner padding; on hover
+        // the shadow deepens and the card lifts 2px (per CLAUDE.md spec).
         'rounded-2xl p-4 shadow-sm transition-all duration-150',
         'hover:-translate-y-0.5 hover:shadow-md',
         colorClass,
         className
       )}
     >
-      {/* Pills + edit-button 行 — 渲染条件:有 label OR 传了 onEditClick。
-          ml-auto 让 button 永远靠右,即使 pills 区域不渲染(避免空 placeholder div);
-          items-start 让 pills 多行 wrap 时 button 仍贴顶部对齐。 */}
+      {/* Pills + edit-button row — rendered when there's at least one
+          label OR an onEditClick handler is passed. ml-auto keeps the
+          button pinned right even when the pills section isn't rendered
+          (avoids an empty placeholder div); items-start keeps the button
+          aligned to the top edge when pills wrap onto multiple lines. */}
       {(labelCount > 0 || onEditClick) && (
         <div className="mb-3 flex items-start gap-2">
           {labelCount > 0 && (
@@ -86,8 +89,15 @@ export function TaskCard({ task, className, onEditClick }: Props) {
           {onEditClick && (
             <button
               type="button"
+              // onPointerDown stops dnd-kit's PointerSensor from seeing
+              // the pointerdown event (the sensor is on the
+              // SortableTaskCard ancestor); onClick stops the click from
+              // bubbling. Defense in depth — the distance:8 sensor
+              // constraint already filters out most accidental drags;
+              // this is an extra layer for cases where the user moves
+              // 8px+ while clicking.
+              onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
-                // stopPropagation 防止 Step 6 加 drag 后误触发拖拽
                 e.stopPropagation()
                 onEditClick(task.id)
               }}
@@ -100,10 +110,12 @@ export function TaskCard({ task, className, onEditClick }: Props) {
         </div>
       )}
 
-      {/* Title — color 继承自卡 fg;leading-tight 让多行 title 也紧凑;
-          high/low priority 在 title 前加 emoji(normal 不渲染)。
-          flex + items-baseline + shrink-0 比 inline span margin 跨浏览器
-          更稳;baseline 让 emoji 跟 title 文字基线对齐(不是顶对齐)。 */}
+      {/* Title — color inherits from the card fg; leading-tight keeps
+          multi-line titles compact. high/low priority tasks get an
+          emoji prefix (normal renders none). flex + items-baseline +
+          shrink-0 is more cross-browser stable than inline span margins;
+          baseline aligns the emoji with the title text baseline (rather
+          than top-aligned). */}
       <div className="flex items-baseline gap-1.5">
         {PRIORITY_EMOJI[task.priority] && (
           <span
@@ -116,25 +128,28 @@ export function TaskCard({ task, className, onEditClick }: Props) {
         <h3 className="text-base font-semibold leading-tight">{task.title}</h3>
       </div>
 
-      {/* Note — text-slate-500 显式 override 卡 fg,跟 title 形成层级;
-          line-clamp-3 防止过长 note 把卡撑得过高(Tailwind v4 原生支持) */}
+      {/* Note — text-slate-500 explicitly overrides the card's fg so the
+          note sits at a lower visual hierarchy than the title;
+          line-clamp-3 prevents an over-long note from making the card
+          too tall (Tailwind v4 supports this natively). */}
       {task.description && (
         <p className="mt-2 text-sm text-slate-500 line-clamp-3">
           Note: {task.description}
         </p>
       )}
 
-      {/* Footer 行:左 avatar,右 [due-date?, label-count?] */}
+      {/* Footer row: avatar on the left, [due-date?, label-count?] on the right */}
       <div className="mt-4 flex items-center justify-between">
         <AvatarBubble userId={task.user_id} size="sm" />
         <div className="flex items-center gap-2">
-          {/* Done 列不显示 due-date — "X days overdue" 在已完成任务上无意义 */}
+          {/* Done column doesn't show due-date — "X days overdue" is
+              meaningless on a completed task. */}
           {task.due_date && task.status !== 'done' && (
             <DueDateBadge dueDate={task.due_date} />
           )}
           {labelCount > 0 && (
-            // 跟 DueDateBadge 同款 pill 形状,视觉节奏一致;
-            // slate 中性色不跟 severity 色抢权重
+            // Same pill shape as DueDateBadge for visual rhythm; neutral
+            // slate avoids competing with severity colors for attention.
             <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
               <Tag className="h-3 w-3" aria-hidden="true" />
               {labelCount}
