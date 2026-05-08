@@ -30,8 +30,3 @@ dist-ssr
 
 # Supabase local dev (if you use supabase CLI later)
 .supabase/
-
-# AI workflow files (kept local, not pushed to GitHub)
-CLAUDE.md
-docs/
-.claude/
