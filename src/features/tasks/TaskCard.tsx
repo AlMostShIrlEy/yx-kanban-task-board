@@ -3,6 +3,7 @@ import { AvatarBubble } from '../../components/AvatarBubble'
 import { DueDateBadge } from '../../components/DueDateBadge'
 import { TagPill } from '../../components/TagPill'
 import { cn } from '../../lib/cn'
+import { useTasks } from './hooks/useTasks'
 import type { CardColor, Priority, Task } from '../../types'
 import { CARD_COLORS } from '../../types'
 
@@ -58,6 +59,12 @@ export function TaskCard({ task, className, onEditClick }: Props) {
   const colorKey = task.color ?? hashColor(task.id)
   const colorClass = CARD_COLOR_CLASSES[colorKey]
   const labelCount = task.labels.length
+  // Lighter touch than prop-drilling through Column: TaskCard reads
+  // from context directly. With ~7 cards, the per-Set-change rerender
+  // is well under any visible cost. Self-action (optimistic mutations)
+  // doesn't go through onEcho, so dragging your own card never flashes.
+  const { highlightedTaskIds } = useTasks()
+  const isHighlighted = highlightedTaskIds.has(task.id)
 
   return (
     <article
@@ -67,6 +74,12 @@ export function TaskCard({ task, className, onEditClick }: Props) {
         'rounded-2xl p-4 shadow-sm transition-all duration-150',
         'hover:-translate-y-0.5 hover:shadow-md',
         colorClass,
+        // Realtime echo flash: brief emerald ring when this task was
+        // just touched by an event from another tab. Fades via the
+        // existing transition-all duration-150. Soft tint chosen to sit
+        // gently on pastel card backgrounds without competing with
+        // priority/due-date severity colors.
+        isHighlighted && 'ring-2 ring-emerald-300/40',
         className
       )}
     >

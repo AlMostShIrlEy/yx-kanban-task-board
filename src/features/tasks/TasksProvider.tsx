@@ -10,6 +10,8 @@ import type { ReactNode } from 'react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../auth/hooks/useAuth'
+import { useRealtime } from './hooks/useRealtime'
+import type { ConnectionStatus } from './hooks/useRealtime'
 import type {
   Label,
   NewLabel,
@@ -91,6 +93,13 @@ export interface TasksContextValue {
   loading: boolean
   error: Error | null
 
+  // Realtime: ids of tasks that were just touched by a remote event.
+  // Read by TaskCard to render a brief emerald ring (echo flash).
+  // ReadonlySet so consumers can't accidentally mutate the source set.
+  highlightedTaskIds: ReadonlySet<string>
+  // Realtime channel state, surfaced by <RealtimeStatus> in the sidebar.
+  connectionStatus: ConnectionStatus
+
   createTask: (input: NewTask) => Promise<Task>
   updateTask: (id: string, patch: TaskPatch) => Promise<void>
   deleteTask: (id: string) => Promise<void>
@@ -131,6 +140,13 @@ export function TasksProvider({ children }: Props) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
 
+  // Echo flash: ids of tasks touched by a remote event in the last
+  // ~350ms. New Set on each change so React detects identity change
+  // and re-renders TaskCards.
+  const [highlightedTaskIds, setHighlightedTaskIds] = useState<Set<string>>(
+    () => new Set()
+  )
+
   // Refs hold latest committed state for callback-time reads. Mutations
   // read via these refs so their useCallback deps stay minimal (basically
   // [user.id]), which keeps mutation references stable, which keeps the
@@ -150,29 +166,40 @@ export function TasksProvider({ children }: Props) {
     labelsRef.current = labels
   }, [tasks, labels])
 
-  // ─── Initial fetch ─────────────────────────────────────────────────
-  useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    setError(null)
-
-    Promise.all([
+  // ─── fetchAll: shared by initial load + realtime reconnect ─────────
+  // Extracted as a useCallback so useRealtime can call it on reconnect.
+  // The optional `signal` lets the initial-fetch effect skip writing
+  // state if the component unmounts mid-flight (StrictMode / user
+  // change). Realtime callers pass nothing — last-write-wins is fine
+  // for that path.
+  const fetchAll = useCallback(
+    async (signal?: { aborted: boolean }): Promise<void> => {
       // PostgREST m2m hint: passing `labels(*)` as the embedded resource
       // resolves THROUGH the task_labels join table automatically (FK
       // detection on the join table's two columns). Returned shape is
       // exactly Task & { labels: Label[] }, no client-side flatten.
-      supabase.from('tasks').select('*, labels(*)').order('position'),
-      supabase.from('labels').select('*').order('name'),
-    ])
-      .then(([tasksRes, labelsRes]) => {
-        if (cancelled) return
-        if (tasksRes.error) throw tasksRes.error
-        if (labelsRes.error) throw labelsRes.error
-        setTasks((tasksRes.data ?? []) as Task[])
-        setLabels((labelsRes.data ?? []) as Label[])
-      })
+      const [tasksRes, labelsRes] = await Promise.all([
+        supabase.from('tasks').select('*, labels(*)').order('position'),
+        supabase.from('labels').select('*').order('name'),
+      ])
+      if (signal?.aborted) return
+      if (tasksRes.error) throw tasksRes.error
+      if (labelsRes.error) throw labelsRes.error
+      setTasks((tasksRes.data ?? []) as Task[])
+      setLabels((labelsRes.data ?? []) as Label[])
+    },
+    [user.id]
+  )
+
+  // ─── Initial fetch ─────────────────────────────────────────────────
+  useEffect(() => {
+    const signal = { aborted: false }
+    setLoading(true)
+    setError(null)
+
+    fetchAll(signal)
       .catch((err: unknown) => {
-        if (cancelled) return
+        if (signal.aborted) return
         const e = err instanceof Error ? err : new Error(String(err))
         setError(e)
         toast.error('Failed to load board', {
@@ -180,14 +207,57 @@ export function TasksProvider({ children }: Props) {
         })
       })
       .finally(() => {
-        if (cancelled) return
+        if (signal.aborted) return
         setLoading(false)
       })
 
     return () => {
-      cancelled = true
+      signal.aborted = true
     }
-  }, [user.id])
+  }, [fetchAll])
+
+  // ─── Echo flash: mark a task as recently touched by realtime ───────
+  const markEchoed = useCallback((taskId: string) => {
+    // Skip if the task is no longer in state. Cascade scenario: a
+    // task_labels DELETE event fires onEcho(task_id) at the same time
+    // the task's own DELETE event has already removed the row from
+    // state. Flashing a non-existent card has no visible effect — and
+    // would just churn highlightedTaskIds for 350ms. tasksRef is sync'd
+    // post-commit (see the sync useEffect above); a microsecond-window
+    // race where both DELETEs land in the same microtask could let one
+    // through, which is harmless and not worth chasing.
+    if (!tasksRef.current.some((t) => t.id === taskId)) return
+
+    setHighlightedTaskIds((prev) => {
+      if (prev.has(taskId)) return prev
+      const next = new Set(prev)
+      next.add(taskId)
+      return next
+    })
+    // Schedule removal after the flash window. Multiple echoes for the
+    // same id within the window each schedule a removal — the second
+    // hits an already-clean set and short-circuits via the `has` guard,
+    // so over-scheduling is harmless.
+    setTimeout(() => {
+      setHighlightedTaskIds((prev) => {
+        if (!prev.has(taskId)) return prev
+        const next = new Set(prev)
+        next.delete(taskId)
+        return next
+      })
+    }, 350)
+  }, [])
+
+  // ─── Realtime subscription ─────────────────────────────────────────
+  const { connectionStatus } = useRealtime({
+    userId: user.id,
+    setTasks,
+    setLabels,
+    tasksRef,
+    labelsRef,
+    refetchAll: fetchAll,
+    onEcho: markEchoed,
+  })
 
   // ─── Mutations ─────────────────────────────────────────────────────
   // All useCallbacks have minimal deps. State reads go through tasksRef /
@@ -281,7 +351,17 @@ export function TasksProvider({ children }: Props) {
 
       // Swap the temp-id optimistic task for the real one (real id,
       // server timestamps, server-confirmed position).
-      setTasks((prev) => prev.map((t) => (t.id === tempId ? realTask : t)))
+      //
+      // Race-aware: a realtime echo for our own INSERT can beat the
+      // INSERT response (the channel is a separate connection). If the
+      // echo handler already appended realTask, we just clean up the
+      // temp instead of duplicating the row.
+      setTasks((prev) => {
+        if (prev.some((t) => t.id === realTask.id)) {
+          return prev.filter((t) => t.id !== tempId)
+        }
+        return prev.map((t) => (t.id === tempId ? realTask : t))
+      })
       return realTask
     },
     [user.id]
@@ -399,9 +479,15 @@ export function TasksProvider({ children }: Props) {
         errorMessage: 'Failed to create label',
       })
 
-      setLabels((prev) =>
-        prev.map((l) => (l.id === tempId ? realLabel : l))
-      )
+      // Race-aware swap: realtime echo for our own label INSERT may
+      // have appended realLabel before this swap runs. Same pattern
+      // as createTask above.
+      setLabels((prev) => {
+        if (prev.some((l) => l.id === realLabel.id)) {
+          return prev.filter((l) => l.id !== tempId)
+        }
+        return prev.map((l) => (l.id === tempId ? realLabel : l))
+      })
       return realLabel
     },
     [user.id]
@@ -535,6 +621,8 @@ export function TasksProvider({ children }: Props) {
       labels,
       loading,
       error,
+      highlightedTaskIds,
+      connectionStatus,
       createTask,
       updateTask,
       deleteTask,
@@ -549,6 +637,8 @@ export function TasksProvider({ children }: Props) {
       labels,
       loading,
       error,
+      highlightedTaskIds,
+      connectionStatus,
       createTask,
       updateTask,
       deleteTask,

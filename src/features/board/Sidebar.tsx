@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { CheckSquare } from 'lucide-react'
 import type { User } from '@supabase/supabase-js'
 import { AvatarBubble } from '../../components/AvatarBubble'
+import { RealtimeStatus } from '../../components/RealtimeStatus'
 
 interface Props {
   taskCount: number
@@ -64,6 +65,11 @@ export function Sidebar({ taskCount, user, children }: Props) {
         </p>
         {children}
       </div>
+
+      {/* Realtime connection indicator — quiet single-line strip
+          between stats and user card. Has its own border-t for visual
+          separation. */}
+      <RealtimeStatus />
 
       {/* User card — avatar + 2-line text block (Guest + short id).
           border-t separates from stats. min-w-0 + flex-1 lets the id
