@@ -234,10 +234,26 @@ GRANT USAGE ON SCHEMA public TO authenticated;
 NOTIFY pgrst, 'reload schema';
 
 -- ------------------------------------------------------------
--- (Future / Phase 5) Realtime publication
+-- 8. Realtime configuration
 -- ------------------------------------------------------------
--- Uncomment when wiring Realtime. Verify the `authenticated` role has SELECT
--- on the target tables (App uses Supabase Anonymous Auth → users are
--- authenticated, not anon).
+-- Required for realtime DELETE events: payload.old must include user_id
+-- so the channel filter (user_id=eq.<userId>) can match. DEFAULT replica
+-- identity only includes PK, which causes server-side filter to drop
+-- DELETE events.
+--
+-- Applied to tables that the client subscribes to WITH a column-based
+-- filter. task_labels is NOT changed because its channel listener has
+-- no filter (RLS-only gating). Re-running these statements is safe —
+-- REPLICA IDENTITY is a SET, not an ADD.
+
+ALTER TABLE public.tasks  REPLICA IDENTITY FULL;
+ALTER TABLE public.labels REPLICA IDENTITY FULL;
+
+-- Publication membership is configured via the Supabase dashboard
+-- (Database → Replication → supabase_realtime). The ALTER PUBLICATION
+-- statements below are kept as a reference for fresh-DB recovery; do NOT
+-- run them blindly because they error if the table is already a member
+-- ("relation ... is already member of publication ...").
 -- ALTER PUBLICATION supabase_realtime ADD TABLE public.tasks;
+-- ALTER PUBLICATION supabase_realtime ADD TABLE public.labels;
 -- ALTER PUBLICATION supabase_realtime ADD TABLE public.task_labels;
