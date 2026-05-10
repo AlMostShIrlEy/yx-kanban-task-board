@@ -23,6 +23,38 @@
   --color-card-yellow-bg: #FFF3D5;
   --color-card-yellow-fg: #854D0E;
 
+  /* 12 label colors (usage: bg-label-blue-bg + text-label-blue-fg).
+     Values mirror Tailwind's default -50 / -700 stops so label pills
+     stay visually distinct from the deeper, more saturated card
+     palette above — a pill on a same-name card will always read as
+     "pill on top of card", never blend in. Keep aligned with
+     LABEL_COLORS in src/types/index.ts AND the labels.color CHECK
+     constraint in supabase/migrations/0001_initial_schema.sql. */
+  --color-label-blue-bg:    #eff6ff;
+  --color-label-blue-fg:    #1d4ed8;
+  --color-label-purple-bg:  #faf5ff;
+  --color-label-purple-fg:  #7e22ce;
+  --color-label-pink-bg:    #fdf2f8;
+  --color-label-pink-fg:    #be185d;
+  --color-label-orange-bg:  #fff7ed;
+  --color-label-orange-fg:  #c2410c;
+  --color-label-green-bg:   #f0fdf4;
+  --color-label-green-fg:   #15803d;
+  --color-label-yellow-bg:  #fefce8;
+  --color-label-yellow-fg:  #a16207;
+  --color-label-teal-bg:    #f0fdfa;
+  --color-label-teal-fg:    #0f766e;
+  --color-label-cyan-bg:    #ecfeff;
+  --color-label-cyan-fg:    #0e7490;
+  --color-label-red-bg:     #fef2f2;
+  --color-label-red-fg:     #b91c1c;
+  --color-label-lime-bg:    #f7fee7;
+  --color-label-lime-fg:    #4d7c0f;
+  --color-label-slate-bg:   #f8fafc;
+  --color-label-slate-fg:   #334155;
+  --color-label-fuchsia-bg: #fdf4ff;
+  --color-label-fuchsia-fg: #a21caf;
+
   /* Brand / Action */
   --color-brand:  #7C3AED;
   --color-action: #0F172A;

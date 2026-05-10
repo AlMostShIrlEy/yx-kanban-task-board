@@ -3,7 +3,14 @@ import { ColorPicker } from './ColorPicker'
 import { LabelMultiSelect } from './LabelMultiSelect'
 import { cn } from '../../lib/cn'
 import { PRIORITIES, STATUSES } from '../../types'
-import type { CardColor, Label, Priority, Status } from '../../types'
+import type {
+  CardColor,
+  Label,
+  NewLabel,
+  Priority,
+  Status,
+  Task,
+} from '../../types'
 import type { FormState } from './taskModalActions'
 
 const STATUS_LABELS: Record<Status, string> = {
@@ -28,6 +35,14 @@ interface Props {
   updateField: <K extends keyof FormState>(key: K, value: FormState[K]) => void
   toggleLabel: (labelId: string) => void
   availableLabels: Label[]
+  tasks: Task[]
+  onCreateLabel: (input: NewLabel) => Promise<Label>
+  onLabelCreated: (labelId: string) => void
+  onUpdateLabel: (
+    id: string,
+    patch: Partial<Pick<NewLabel, 'name' | 'color'>>
+  ) => Promise<void>
+  onDeleteLabel: (id: string) => Promise<void>
 }
 
 // All form-field JSX for TaskModal — extracted to keep TaskModal under
@@ -37,6 +52,11 @@ export function TaskFormFields({
   updateField,
   toggleLabel,
   availableLabels,
+  tasks,
+  onCreateLabel,
+  onLabelCreated,
+  onUpdateLabel,
+  onDeleteLabel,
 }: Props) {
   return (
     <>
@@ -118,7 +138,12 @@ export function TaskFormFields({
         <LabelMultiSelect
           availableLabels={availableLabels}
           selectedIds={form.selectedLabelIds}
+          tasks={tasks}
           onToggle={toggleLabel}
+          onCreate={onCreateLabel}
+          onLabelCreated={onLabelCreated}
+          onUpdate={onUpdateLabel}
+          onDelete={onDeleteLabel}
         />
       </Field>
     </>

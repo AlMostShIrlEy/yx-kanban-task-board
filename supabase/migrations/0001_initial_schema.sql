@@ -54,11 +54,13 @@ CREATE TABLE IF NOT EXISTS public.tasks (
 );
 
 -- labels
+-- color check accepts 12 hues (the original 6 card colors + 6 label-only
+-- additions). Keep aligned with LABEL_COLORS in src/types/index.ts.
 CREATE TABLE IF NOT EXISTS public.labels (
   id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id    uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   name       text NOT NULL CHECK (char_length(name) <= 30),
-  color      text NOT NULL CHECK (color IN ('blue', 'purple', 'pink', 'orange', 'green', 'yellow')),
+  color      text NOT NULL CHECK (color IN ('blue', 'purple', 'pink', 'orange', 'green', 'yellow', 'teal', 'cyan', 'red', 'lime', 'slate', 'fuchsia')),
   created_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT labels_user_name_unique UNIQUE (user_id, name)
 );

@@ -33,6 +33,27 @@ export const CARD_COLORS = [
 ] as const
 export type CardColor = (typeof CARD_COLORS)[number]
 
+// Label palette is a superset of the card palette: the first 6 entries
+// share names AND values with CARD_COLORS so existing seed labels stay
+// visually identical, and 6 additional hues give label authoring more
+// breathing room. Keep this list aligned with the labels.color CHECK
+// constraint in supabase/migrations/0001_initial_schema.sql.
+export const LABEL_COLORS = [
+  'blue',
+  'purple',
+  'pink',
+  'orange',
+  'green',
+  'yellow',
+  'teal',
+  'cyan',
+  'red',
+  'lime',
+  'slate',
+  'fuchsia',
+] as const
+export type LabelColor = (typeof LABEL_COLORS)[number]
+
 // ─── Domain models (what components consume) ──────────────────────
 //
 // IMPORTANT: When rendering Task.color, always provide a fallback.
@@ -44,11 +65,12 @@ export type CardColor = (typeof CARD_COLORS)[number]
 // Label.color is required (SQL NOT NULL); a colorless label has no
 // visual meaning. Compare to Task.color which is nullable — colorless
 // tasks fall back to a hashed color (see Task.color note above).
+// Uses the wider LabelColor palette (12 hues), not CardColor.
 export interface Label {
   id: string
   user_id: string
   name: string
-  color: CardColor
+  color: LabelColor
   created_at: string // ISO 8601 timestamp
 }
 
@@ -107,5 +129,5 @@ export type TaskPatch = Partial<
 
 export interface NewLabel {
   name: string
-  color: CardColor
+  color: LabelColor
 }

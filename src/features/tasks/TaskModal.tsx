@@ -34,8 +34,18 @@ function TaskModalContent({
   onClose: () => void
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null)
-  const { labels, createTask, updateTask, deleteTask, attachLabel, detachLabel } =
-    useTasks()
+  const {
+    tasks,
+    labels,
+    createTask,
+    updateTask,
+    deleteTask,
+    attachLabel,
+    detachLabel,
+    createLabel,
+    updateLabel,
+    deleteLabel,
+  } = useTasks()
 
   // useState lazy init: only runs once at mount. The outer TaskModal uses
   // `key` to force a remount when switching to a different task, so lazy
@@ -73,6 +83,21 @@ function TaskModalContent({
     return () => dialog.removeEventListener('close', handleClose)
   }, [onClose])
 
+  // Self-heal: if a label disappears from the global list (deleted from
+  // this tab OR another tab via realtime), drop it from the in-progress
+  // selection. Otherwise save would attempt to attach a non-existent
+  // label and the join FK would reject it. Short-circuit when nothing
+  // changed so React bails out on the setState.
+  useEffect(() => {
+    setForm((prev) => {
+      const aliveIds = new Set(labels.map((l) => l.id))
+      const filtered = prev.selectedLabelIds.filter((id) => aliveIds.has(id))
+      return filtered.length === prev.selectedLabelIds.length
+        ? prev
+        : { ...prev, selectedLabelIds: filtered }
+    })
+  }, [labels])
+
   // Backdrop click — when target is the dialog element itself (vs the
   // inner content), user clicked outside the panel area.
   function handleDialogClick(e: MouseEvent<HTMLDialogElement>) {
@@ -97,6 +122,17 @@ function TaskModalContent({
       form.selectedLabelIds.includes(labelId)
         ? form.selectedLabelIds.filter((id) => id !== labelId)
         : [...form.selectedLabelIds, labelId]
+    )
+
+  // Auto-attach a freshly created label to the in-progress form. Uses
+  // the functional setForm to avoid racing with concurrent toggles.
+  // The includes-check makes the callback idempotent in case the same
+  // labelId arrives twice (defensive; not currently possible).
+  const handleLabelCreated = (labelId: string) =>
+    setForm((prev) =>
+      prev.selectedLabelIds.includes(labelId)
+        ? prev
+        : { ...prev, selectedLabelIds: [...prev.selectedLabelIds, labelId] }
     )
 
   async function handleSave() {
@@ -163,6 +199,11 @@ function TaskModalContent({
             updateField={updateField}
             toggleLabel={toggleLabel}
             availableLabels={labels}
+            tasks={tasks}
+            onCreateLabel={createLabel}
+            onLabelCreated={handleLabelCreated}
+            onUpdateLabel={updateLabel}
+            onDeleteLabel={deleteLabel}
           />
         </div>
 

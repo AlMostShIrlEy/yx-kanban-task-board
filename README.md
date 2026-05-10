@@ -116,7 +116,7 @@ The first time you sign in, the auth provider awaits the demo-seed insert before
 │   └── types/                 # Shared TypeScript domain types
 ├── supabase/
 │   └── migrations/            # SQL schema (canonical source of truth)
-├── docs/                      # Design reference image, planning doc
+├── docs/                      # Design reference image
 └── public/                    # Static assets served as-is by Vite
 ```
 

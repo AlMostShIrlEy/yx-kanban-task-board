@@ -1,40 +1,40 @@
 import type { ReactNode } from 'react'
 import { cn } from '../lib/cn'
-import type { CardColor } from '../types'
+import type { LabelColor } from '../types'
 
 interface Props {
-  color: CardColor
+  color: LabelColor
   children: ReactNode
   className?: string
 }
 
-// Label palette is intentionally distinct from the card palette (which uses
-// the bg-card-X-bg / text-card-X-fg @theme tokens). Pills use lighter
-// Tailwind -50/-700 stops so a label always sits visually on top of any
-// card background — no risk of a "blue label on blue card" disappearing.
-// Both palettes share the same 6 color names (CardColor enum) for API
-// simplicity; they differ only in rendered class strings.
+// 12 label colors render via the bg-label-X-bg / text-label-X-fg @theme
+// tokens. The first 6 mirror the card palette so seeded labels look
+// identical to before; the rest are label-only hues.
 //
 // Static lookup so Tailwind v4 JIT can scan the literal class names —
-// dynamic `bg-${color}-50` strings would NOT be picked up.
-const COLOR_CLASSES: Record<CardColor, string> = {
-  blue:   'bg-blue-50 text-blue-700',
-  purple: 'bg-purple-50 text-purple-700',
-  pink:   'bg-pink-50 text-pink-700',
-  orange: 'bg-orange-50 text-orange-700',
-  green:  'bg-green-50 text-green-700',
-  yellow: 'bg-yellow-50 text-yellow-700',
+// dynamic `bg-label-${color}-bg` strings would NOT be picked up.
+const COLOR_CLASSES: Record<LabelColor, string> = {
+  blue:    'bg-label-blue-bg text-label-blue-fg',
+  purple:  'bg-label-purple-bg text-label-purple-fg',
+  pink:    'bg-label-pink-bg text-label-pink-fg',
+  orange:  'bg-label-orange-bg text-label-orange-fg',
+  green:   'bg-label-green-bg text-label-green-fg',
+  yellow:  'bg-label-yellow-bg text-label-yellow-fg',
+  teal:    'bg-label-teal-bg text-label-teal-fg',
+  cyan:    'bg-label-cyan-bg text-label-cyan-fg',
+  red:     'bg-label-red-bg text-label-red-fg',
+  lime:    'bg-label-lime-bg text-label-lime-fg',
+  slate:   'bg-label-slate-bg text-label-slate-fg',
+  fuchsia: 'bg-label-fuchsia-bg text-label-fuchsia-fg',
 }
 
 // Soft pill for #tag / label rendering. Color required (Label.color is
-// SQL NOT NULL); see palette comment above for the dual-track design.
+// SQL NOT NULL).
 export function TagPill({ color, children, className }: Props) {
   return (
     <span
       className={cn(
-        // Rounded pill + compact padding + small bold text, matching the
-        // #tag rhythm in the design reference; inline-flex lets parent
-        // layouts wrap and place icons inline.
         'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
         COLOR_CLASSES[color],
         className

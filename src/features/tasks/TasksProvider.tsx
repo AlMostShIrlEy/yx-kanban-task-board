@@ -36,6 +36,17 @@ function errorDescription(err: unknown): string {
   return String(err)
 }
 
+// Pull a Postgres SQLSTATE off whatever Supabase threw. Used to detect
+// 23505 unique-violation on labels (createLabel + updateLabel) so the
+// caller can surface a name-specific toast instead of the generic one.
+function extractPgErrorCode(err: unknown): string | undefined {
+  if (typeof err === 'object' && err !== null && 'code' in err) {
+    const code = (err as { code: unknown }).code
+    if (typeof code === 'string') return code
+  }
+  return undefined
+}
+
 // Central optimistic-mutation helper. The contract:
 //   apply  — synchronous local-state update (writes via functional setState)
 //   remote — async work; caller unwraps supabase {data, error} and throws
@@ -108,6 +119,10 @@ export interface TasksContextValue {
   moveTask: (id: string, toStatus: Status, toPosition: number) => Promise<void>
 
   createLabel: (input: NewLabel) => Promise<Label>
+  updateLabel: (
+    id: string,
+    patch: Partial<Pick<NewLabel, 'name' | 'color'>>
+  ) => Promise<void>
   deleteLabel: (id: string) => Promise<void>
 
   attachLabel: (taskId: string, labelId: string) => Promise<void>
@@ -458,26 +473,37 @@ export function TasksProvider({ children }: Props) {
         created_at: new Date().toISOString(),
       }
 
-      const realLabel = await optimistic<Label>({
-        apply: () => setLabels((prev) => [...prev, optimisticLabel]),
-        remote: async () => {
-          const { data, error: e } = await supabase
-            .from('labels')
-            .insert({
-              user_id: user.id,
-              name: input.name,
-              color: input.color,
-            })
-            .select('*')
-            .single()
-          if (e) throw e
-          if (!data) throw new Error('Insert returned no data')
-          return data as Label
-        },
-        revert: () =>
-          setLabels((prev) => prev.filter((l) => l.id !== tempId)),
-        errorMessage: 'Failed to create label',
-      })
+      // Hand-rolled optimistic flow (not using the optimistic() helper)
+      // because we need to translate Postgres unique-violation (code
+      // 23505 from the labels_user_name_unique constraint) into a
+      // user-friendly toast distinct from the generic failure message.
+      setLabels((prev) => [...prev, optimisticLabel])
+      let realLabel: Label
+      try {
+        const { data, error: e } = await supabase
+          .from('labels')
+          .insert({
+            user_id: user.id,
+            name: input.name,
+            color: input.color,
+          })
+          .select('*')
+          .single()
+        if (e) throw e
+        if (!data) throw new Error('Insert returned no data')
+        realLabel = data as Label
+      } catch (err) {
+        setLabels((prev) => prev.filter((l) => l.id !== tempId))
+        if (extractPgErrorCode(err) === '23505') {
+          // labels_user_name_unique — same name already exists for this user.
+          toast.error('Label with this name already exists.')
+        } else {
+          toast.error('Failed to create label', {
+            description: errorDescription(err),
+          })
+        }
+        throw err
+      }
 
       // Race-aware swap: realtime echo for our own label INSERT may
       // have appended realLabel before this swap runs. Same pattern
@@ -491,6 +517,67 @@ export function TasksProvider({ children }: Props) {
       return realLabel
     },
     [user.id]
+  )
+
+  const updateLabel = useCallback(
+    async (
+      id: string,
+      patch: Partial<Pick<NewLabel, 'name' | 'color'>>
+    ): Promise<void> => {
+      const snapshot = labelsRef.current.find((l) => l.id === id)
+      if (!snapshot) return
+      // Caller is expected to send a non-empty patch; bail silently if
+      // they don't (avoids a no-op UPDATE round-trip).
+      if (Object.keys(patch).length === 0) return
+
+      const updated: Label = { ...snapshot, ...patch }
+
+      // Optimistic apply: replace the row in `labels` AND mirror the
+      // change into every embedded copy in `tasks.labels` so cards
+      // reflect the new name/color without waiting for the realtime
+      // echo. Mirrors what handleLabelChange UPDATE does for foreign
+      // updates.
+      setLabels((prev) => prev.map((l) => (l.id === id ? updated : l)))
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.labels.some((l) => l.id === id)
+            ? { ...t, labels: t.labels.map((l) => (l.id === id ? updated : l)) }
+            : t
+        )
+      )
+
+      // Hand-rolled flow (not optimistic() helper) for the same reason
+      // as createLabel: 23505 needs a name-specific toast distinct from
+      // the generic failure message.
+      try {
+        const { error: e } = await supabase
+          .from('labels')
+          .update(patch)
+          .eq('id', id)
+        if (e) throw e
+      } catch (err) {
+        setLabels((prev) => prev.map((l) => (l.id === id ? snapshot : l)))
+        setTasks((prev) =>
+          prev.map((t) =>
+            t.labels.some((l) => l.id === id)
+              ? {
+                  ...t,
+                  labels: t.labels.map((l) => (l.id === id ? snapshot : l)),
+                }
+              : t
+          )
+        )
+        if (extractPgErrorCode(err) === '23505') {
+          toast.error('Label with this name already exists.')
+        } else {
+          toast.error('Failed to update label', {
+            description: errorDescription(err),
+          })
+        }
+        throw err
+      }
+    },
+    []
   )
 
   const deleteLabel = useCallback(async (id: string): Promise<void> => {
@@ -628,6 +715,7 @@ export function TasksProvider({ children }: Props) {
       deleteTask,
       moveTask,
       createLabel,
+      updateLabel,
       deleteLabel,
       attachLabel,
       detachLabel,
@@ -644,6 +732,7 @@ export function TasksProvider({ children }: Props) {
       deleteTask,
       moveTask,
       createLabel,
+      updateLabel,
       deleteLabel,
       attachLabel,
       detachLabel,
